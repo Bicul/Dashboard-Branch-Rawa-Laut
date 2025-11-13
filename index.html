@@ -2851,156 +2851,135 @@
         }
 
         // --- FUNGSI SALES RANKING ---
-        function renderSalesRanking() {
-            const newCustomersRankingDiv = document.getElementById('newCustomersRanking');
-            const suspendedCustomersRankingDiv = document.getElementById('suspendedCustomersRanking');
-            const terminatedCustomersRankingDiv = document.getElementById('terminatedCustomersRanking');
-            const rankingMonthYearSpan = document.getElementById('rankingMonthYear'); // Changed ID
+        // --- FUNGSI UTAMA: SALES RANKING ---
+function renderSalesRanking(selectedMonth = null, selectedYear = null) {
+    const now = new Date();
+    const month = selectedMonth ?? now.getMonth() + 1; // default: bulan sekarang
+    const year = selectedYear ?? now.getFullYear();
 
-            newCustomersRankingDiv.innerHTML = '<p class="text-center text-gray-500">Memuat peringkat...</p>';
-            suspendedCustomersRankingDiv.innerHTML = '<p class="text-center text-gray-500">Memuat peringkat...</p>';
-            terminatedCustomersRankingDiv.innerHTML = '<p class="text-center text-gray-500">Memuat peringkat...</p>';
+    const newCustomersDiv = document.getElementById('newCustomersRanking');
+    const suspendedCustomersDiv = document.getElementById('suspendedCustomersRanking');
+    const terminatedCustomersDiv = document.getElementById('terminatedCustomersRanking');
+    const rankingMonthYearSpan = document.getElementById('rankingMonthYear');
 
-            const now = new Date();
-            const currentYear = now.getFullYear();
-            const currentMonth = (now.getMonth() + 1).toString().padStart(2, '0'); // '06' for June
-            const currentMonthYear = `${currentYear}-${currentMonth}`;
-            
-            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-            rankingMonthYearSpan.textContent = `${monthNames[now.getMonth()]} ${currentYear}`; // Updated text
+    const monthNames = [
+        "Januari","Februari","Maret","April","Mei","Juni",
+        "Juli","Agustus","September","Oktober","November","Desember"
+    ];
 
-            const salesStats = {};
+    // Update judul bulan/tahun
+    rankingMonthYearSpan.textContent = `${monthNames[month - 1]} ${year}`;
 
-            allCustomers.forEach(customer => {
-                const salesCode = customer.SALESCODE;
-                if (!salesCode) return;
+    // Placeholder loading
+    [newCustomersDiv, suspendedCustomersDiv, terminatedCustomersDiv].forEach(div => {
+        div.innerHTML = '<p class="text-center text-gray-500">Memuat peringkat...</p>';
+    });
 
-                if (!salesStats[salesCode]) {
-                    salesStats[salesCode] = { New: 0, Suspended: 0, Terminated: 0 };
-                }
+    const salesStats = {};
 
-                // Periksa bulan saat ini untuk pelanggan baru (CONTRACTSTARTDATE)
-                const contractDate = parseDate(customer.CONTRACTSTARTDATE);
-                if (customer.STATUS && customer.STATUS.toUpperCase() === 'ACTIVE' && contractDate) {
-                    const customerMonthYear = `${contractDate.getFullYear()}-${(contractDate.getMonth() + 1).toString().padStart(2, '0')}`;
-                    if (customerMonthYear === currentMonthYear) {
-                        salesStats[salesCode].New++;
-                    }
-                } 
-                
-                // Periksa bulan saat ini untuk pelanggan suspend (EXPIREDDATE)
-                const expiredDate = parseDate(customer.EXPIREDDATE);
-                if (customer.STATUS && customer.STATUS.toUpperCase() === 'SUSPENDED' && expiredDate) {
-                    const customerMonthYear = `${expiredDate.getFullYear()}-${(expiredDate.getMonth() + 1).toString().padStart(2, '0')}`;
-                    if (customerMonthYear === currentMonthYear) {
-                        salesStats[salesCode].Suspended++;
-                    }
-                } 
-                
-                // Periksa bulan saat ini untuk pelanggan terminated (TERMDATE)
-                const termDate = parseDate(customer.TERMDATE);
-                if (customer.STATUS && customer.STATUS.toUpperCase() === 'TERMINATED' && termDate) {
-                    const customerMonthYear = `${termDate.getFullYear()}-${(termDate.getMonth() + 1).toString().padStart(2, '0')}`;
-                    if (customerMonthYear === currentMonthYear) {
-                        salesStats[salesCode].Terminated++;
-                    }
-                }
-            });
+    allCustomers.forEach(customer => {
+        const salesCode = customer.SALESCODE;
+        if (!salesCode) return;
 
-            // Sort and display rankings
-            const sortedSalesNew = Object.entries(salesStats)
-                .sort(([, a], [, b]) => b.New - a.New) // Tertinggi ke Terendah (jumlah baru terbanyak = terbaik)
-                .slice(0, 3);
-            displayRanking(newCustomersRankingDiv, sortedSalesNew, 'New', 'sales-new-count');
-
-            const sortedSalesSuspended = Object.entries(salesStats)
-                .sort(([, a], [, b]) => a.Suspended - b.Suspended) // Terendah ke Tertinggi (jumlah suspend tersedikit = terbaik)
-                .slice(0, 3);
-            displayRanking(suspendedCustomersRankingDiv, sortedSalesSuspended, 'Suspended', 'sales-suspended-count');
-
-            const sortedSalesTerminated = Object.entries(salesStats)
-                .sort(([, a], [, b]) => a.Terminated - b.Terminated) // Terendah ke Tertinggi (jumlah terminated tersedikit = terbaik)
-                .slice(0, 3);
-            displayRanking(terminatedCustomersRankingDiv, sortedSalesTerminated, 'Terminated', 'sales-terminated-count');
+        if (!salesStats[salesCode]) {
+            salesStats[salesCode] = { New: 0, Suspended: 0, Terminated: 0 };
         }
 
-        function displayRanking(element, rankingData, type, countClass) {
-            element.innerHTML = ''; // Clear previous content
-            
-            // Filter out sales with 0 count for the specific type
-            const filteredRankingData = rankingData.filter(([, stats]) => stats[type] > 0);
-
-            if (filteredRankingData.length === 0) {
-                element.innerHTML = '<p class="text-center text-gray-500">Tidak ada data untuk bulan ini.</p>';
-                return;
-            }
-
-            filteredRankingData.forEach(([salesCode, stats], index) => {
-                const salesName = salesCodeNames[salesCode] || salesCode;
-                const rankDiv = document.createElement('div');
-                rankDiv.classList.add('ranking-item');
-                
-                let rankBgClass = '';
-                if (index === 0) rankBgClass = 'rank-bg-1';
-                else if (index === 1) rankBgClass = 'rank-bg-2';
-                else if (index === 2) rankBgClass = 'rank-bg-3';
-                
-                rankDiv.innerHTML = `
-                    <span class="rank-number ${rankBgClass} rounded-full flex items-center justify-center p-1 font-bold text-white text-base">${index + 1}</span>
-                    <span class="sales-name">${salesName}</span>
-                    <span class="sales-count ${countClass}">${stats[type]}</span>
-                `;
-                element.appendChild(rankDiv);
-            });
+        // --- Pelanggan Baru (ACTIVE by CONTRACTSTARTDATE)
+        const contractDate = parseDate(customer.CONTRACTSTARTDATE);
+        if (isStatusInMonth(customer.STATUS, 'ACTIVE', contractDate, month, year)) {
+            salesStats[salesCode].New++;
         }
 
-        // Populate Month and Year Selectors for Forecast and New Subs
-        function populateMonthYearSelectors() {
-            const monthSelectors = [
-                document.getElementById('forecastMonthSelect'),
-                document.getElementById('newSubsMonthSelect')
-            ];
-            const yearSelectors = [
-                document.getElementById('forecastYearSelect'),
-                document.getElementById('newSubsYearSelect')
-            ];
-            const currentYear = new Date().getFullYear();
-            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-
-            monthSelectors.forEach(selectElement => {
-                selectElement.innerHTML = '';
-                monthNames.forEach((name, index) => {
-                    const option = document.createElement('option');
-                    option.value = index; // Month index (0-11)
-                    option.textContent = name;
-                    selectElement.appendChild(option);
-                });
-            });
-
-            yearSelectors.forEach(selectElement => {
-                selectElement.innerHTML = '';
-                // Adjusted to go back to 2023 for data filtering
-                for (let year = 2023; year <= currentYear + 5; year++) { // Start from 2023
-                    const option = document.createElement('option');
-                    option.value = year;
-                    option.textContent = year;
-                    selectElement.appendChild(option);
-                }
-            });
-
-            // Set default to current month and year for all
-            const now = new Date();
-            const currentMonth = now.getMonth();
-            const currentFullYear = now.getFullYear();
-
-            monthSelectors.forEach(selectElement => {
-                selectElement.value = currentMonth.toString();
-            });
-            yearSelectors.forEach(selectElement => {
-                selectElement.value = currentFullYear.toString();
-            });
+        // --- Pelanggan Suspended (SUSPENDED by EXPIREDDATE)
+        const expiredDate = parseDate(customer.EXPIREDDATE);
+        if (isStatusInMonth(customer.STATUS, 'SUSPENDED', expiredDate, month, year)) {
+            salesStats[salesCode].Suspended++;
         }
 
+        // --- Pelanggan Terminated (TERMINATED by TERMDATE)
+        const termDate = parseDate(customer.TERMDATE);
+        if (isStatusInMonth(customer.STATUS, 'TERMINATED', termDate, month, year)) {
+            salesStats[salesCode].Terminated++;
+        }
+    });
+
+    // --- Urutkan dan tampilkan ranking
+    displayRanking(newCustomersDiv, sortSales(salesStats, 'New', true), 'New', 'sales-new-count');
+    displayRanking(suspendedCustomersDiv, sortSales(salesStats, 'Suspended', false), 'Suspended', 'sales-suspended-count');
+    displayRanking(terminatedCustomersDiv, sortSales(salesStats, 'Terminated', false), 'Terminated', 'sales-terminated-count');
+}
+
+// --- Fungsi bantu: cek status & tanggal ---
+function isStatusInMonth(status, expectedStatus, date, month, year) {
+    if (!status || !date) return false;
+    const normalized = status.toUpperCase();
+    return (
+        normalized === expectedStatus &&
+        date.getMonth() + 1 === month &&
+        date.getFullYear() === year
+    );
+}
+
+// --- Fungsi bantu: urutkan sales ---
+function sortSales(stats, key, descending = true) {
+    const sorted = Object.entries(stats).sort(([, a], [, b]) =>
+        descending ? b[key] - a[key] : a[key] - b[key]
+    );
+    return sorted.filter(([, s]) => s[key] > 0).slice(0, 3); // ambil top 3
+}
+
+// --- Tampilkan hasil ranking ke HTML ---
+function displayRanking(container, rankingData, type, countClass) {
+    container.innerHTML = '';
+    if (rankingData.length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-500">Tidak ada data untuk bulan ini.</p>';
+        return;
+    }
+
+    rankingData.forEach(([salesCode, stats], i) => {
+        const salesName = salesCodeNames[salesCode] || salesCode;
+        const bgClass = ['rank-bg-1', 'rank-bg-2', 'rank-bg-3'][i] || '';
+
+        container.innerHTML += `
+            <div class="ranking-item flex items-center justify-between py-1 border-b">
+                <span class="rank-number ${bgClass} rounded-full flex items-center justify-center p-1 font-bold text-white text-base">${i + 1}</span>
+                <span class="sales-name">${salesName}</span>
+                <span class="sales-count ${countClass}">${stats[type]}</span>
+            </div>`;
+    });
+}
+
+// --- Populate dropdown bulan & tahun (kalau belum ada) ---
+function populateMonthYearSelectors() {
+    const monthSelectors = [
+        document.getElementById('forecastMonthSelect'),
+        document.getElementById('newSubsMonthSelect')
+    ];
+    const yearSelectors = [
+        document.getElementById('forecastYearSelect'),
+        document.getElementById('newSubsYearSelect')
+    ];
+
+    const currentYear = new Date().getFullYear();
+    const monthNames = [
+        "Januari","Februari","Maret","April","Mei","Juni",
+        "Juli","Agustus","September","Oktober","November","Desember"
+    ];
+
+    monthSelectors.forEach(sel => {
+        sel.innerHTML = monthNames.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('');
+        sel.value = new Date().getMonth() + 1;
+    });
+
+    yearSelectors.forEach(sel => {
+        sel.innerHTML = Array.from({ length: 6 }, (_, i) => {
+            const year = 2023 + i;
+            return `<option value="${year}">${year}</option>`;
+        }).join('');
+        sel.value = currentYear;
+    });
+}
 
         // --- PENDENGAR ACARA & MUATAN AWAL ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -3077,4 +3056,5 @@
 </body>
 
 </html>
+
 
